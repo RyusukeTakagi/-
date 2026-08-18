@@ -198,24 +198,61 @@ function addItemToDay(mealKey, form){
   saveDay(); render();
 }
 
+const RICE_RE = /ご飯|ライス|米/;
+const MAIN_DISH_RE = /肉|魚|卵|たまご|玉子|ハラミ|マグロ|鶏|牛|豚|鮭|サーモン|エビ|海老|イカ|タコ|豆腐|納豆|プロテイン|ササミ|ヒレ|ロース|むね/;
+
+function applyFactorToItems(items, factor){
+  for(const {mealKey,item} of items){
+    const pu = item.perUnit;
+    const newAmount = Math.max(0, round1(item.amount*factor));
+    item.amount = newAmount;
+    item.kcal = round0(pu.kcal*newAmount);
+    item.p = round1(pu.p*newAmount);
+    item.f = round1(pu.f*newAmount);
+    item.c = round1(pu.c*newAmount);
+  }
+}
+
 function adjustToRemaining(){
   if(!state.day) return;
   let consumedKcal=0;
   for(const k of MEAL_ORDER) for(const it of state.day.meals[k]) if(it.checked) consumedKcal += it.kcal;
-  const uncheckedSum = MEAL_ORDER.reduce((s,k)=> s + state.day.meals[k].filter(it=>!it.checked).reduce((a,it)=>a+it.kcal,0), 0);
   const budget = Math.max(0, state.settings.targetKcal - consumedKcal);
-  if(uncheckedSum<=0){ showToast("調整できる未摂取の項目がありません"); return; }
-  const factor = budget/uncheckedSum;
+
+  // classify unchecked items: priority = rice / main-dish (protein sources), rest = fixed
+  const priority = [];
+  const fixed = [];
   for(const k of MEAL_ORDER){
-    state.day.meals[k] = state.day.meals[k].map(it=>{
-      if(it.checked) return it;
-      const pu = it.perUnit;
-      const newAmount = Math.max(0, round1(it.amount*factor));
-      return {...it, amount:newAmount, kcal:round0(pu.kcal*newAmount), p:round1(pu.p*newAmount), f:round1(pu.f*newAmount), c:round1(pu.c*newAmount)};
-    });
+    for(const it of state.day.meals[k]){
+      if(it.checked) continue;
+      if(RICE_RE.test(it.name) || MAIN_DISH_RE.test(it.name)) priority.push({mealKey:k, item:it});
+      else fixed.push({mealKey:k, item:it});
+    }
   }
+
+  if(priority.length===0 && fixed.length===0){ showToast("調整できる未摂取の項目がありません"); return; }
+
+  if(priority.length===0){
+    // no rice/main-dish items found among unchecked -> fall back to adjusting everything
+    const sum = fixed.reduce((s,a)=>s+a.item.kcal,0);
+    if(sum<=0){ showToast("調整できる未摂取の項目がありません"); return; }
+    applyFactorToItems(fixed, budget/sum);
+    saveDay(); render();
+    showToast(`残り ${round0(budget)}kcal に合わせて未摂取分を調整しました`);
+    return;
+  }
+
+  const fixedSum = fixed.reduce((s,a)=>s+a.item.kcal,0);
+  const prioritySum = priority.reduce((s,a)=>s+a.item.kcal,0);
+  let targetForPriority = budget - fixedSum;
+  // keep adjustment within a sane range (15%〜300% of the original rice/main-dish total)
+  const minAllowed = prioritySum*0.15;
+  const maxAllowed = prioritySum*3;
+  targetForPriority = Math.min(maxAllowed, Math.max(minAllowed, targetForPriority));
+
+  applyFactorToItems(priority, prioritySum>0 ? targetForPriority/prioritySum : 1);
   saveDay(); render();
-  showToast(`残り ${round0(budget)}kcal に合わせて未摂取分を調整しました`);
+  showToast(`ご飯・おかずを中心に、残り${round0(budget)}kcalに合わせて調整しました`);
 }
 
 function setSteps(v){
@@ -472,7 +509,7 @@ function addFormHtml(mealKey, scope){
 function settingsSheetHtml(tC){
   const s = state.settings;
   return `<div class="sheet-overlay" data-act="close-overlay" data-which="settings">
-    <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet">
       <div class="sheet-head"><div class="sheet-title">目標設定</div><button class="close-btn" data-act="close-settings">${ICON.x(18)}</button></div>
       <label class="field-label">1日の目標カロリー (kcal)</label>
       <input id="set-kcal" class="form-input num" type="number" value="${s.targetKcal}" style="font-size:16px;font-weight:700;margin-bottom:14px;">
@@ -485,7 +522,7 @@ function settingsSheetHtml(tC){
       <div id="carb-preview" style="font-size:12px;color:#7A7867;padding:10px;background:#fff;border-radius:10px;border:1px solid #E3DFD1;">
         炭水化物は残りカロリーから自動計算されます: <span class="num" style="color:#3E7C6A;font-weight:700;">約${tC}g</span>
       </div>
-      <button class="btn-primary" id="save-settings-btn" style="width:100%;justify-content:center;margin-top:18px;padding:12px;font-size:13.5px;">保存する</button>
+      <button class="btn-primary" data-act="save-settings" style="width:100%;justify-content:center;margin-top:18px;padding:12px;font-size:13.5px;">保存する</button>
     </div>
   </div>`;
 }
@@ -503,7 +540,7 @@ function templateEditorHtml(){
     </div>`;
   }
   return `<div class="sheet-overlay" data-act="close-overlay" data-which="template">
-    <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet">
       <div class="sheet-head"><div class="sheet-title">テンプレート編集</div><button class="close-btn" data-act="close-template">${ICON.x(18)}</button></div>
       <div style="font-size:12px;color:#7A7867;margin-bottom:14px;">ここで編集した内容が「テンプレート適用」ボタンの基本メニューになります。</div>
       ${inner}
@@ -530,12 +567,12 @@ function tmplItemRowHtml(mealKey, it){
 function pasteModalHtml(){
   const preview = state.ui.pastePreview;
   return `<div class="sheet-overlay" data-act="close-overlay" data-which="paste">
-    <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet">
       <div class="sheet-head"><div class="sheet-title">提案を貼り付けて反映</div><button class="close-btn" data-act="close-paste">${ICON.x(18)}</button></div>
       ${!preview ? `
         <div style="font-size:12px;color:#7A7867;margin-bottom:10px;">ChatGPTなどから受け取った提案メニューのテキストをそのまま貼り付けてください。1行に1食材くらいの形式が読み取りやすいです(例: 「鶏むね肉 100g 165kcal P31 F4 C0」)。</div>
         <textarea class="paste-area" id="paste-text" placeholder="鶏むね肉 100g 165kcal P31 F4 C0&#10;もち麦ご飯 150g 240kcal P4 F1 C53&#10;..."></textarea>
-        <button class="btn-primary" id="paste-parse-btn" style="width:100%;justify-content:center;margin-top:12px;padding:11px;">解析してプレビュー</button>
+        <button class="btn-primary" data-act="paste-parse" style="width:100%;justify-content:center;margin-top:12px;padding:11px;">解析してプレビュー</button>
       ` : `
         <label class="field-label">追加する食事</label>
         <select id="paste-meal-select" class="meal-select" style="margin-bottom:12px;">
@@ -544,18 +581,23 @@ function pasteModalHtml(){
         <div style="max-height:38vh;overflow-y:auto;">
           ${preview.length===0 ? `<div style="font-size:12.5px;color:#7A7867;padding:8px 0;">解析できる項目が見つかりませんでした。テキストを見直してください。</div>` : preview.map((it,i)=>`
           <div class="preview-row" data-idx="${i}">
-            <input class="pname" data-pf="name" value="${esc(it.name)}">
-            <input data-pf="amount" type="number" value="${it.amount}">
-            <input data-pf="unit" value="${it.unit}">
-            <input data-pf="kcal" type="number" value="${it.kcal}" title="kcal">
-            <input data-pf="p" type="number" value="${it.p}" title="P">
-            <input data-pf="f" type="number" value="${it.f}" title="F">
-            <button class="del-btn" data-act="paste-del-row" data-idx="${i}">${ICON.x(13)}</button>
+            <div class="preview-name-row">
+              <input data-pf="name" value="${esc(it.name)}">
+              <button class="del-btn" data-act="paste-del-row" data-idx="${i}">${ICON.x(14)}</button>
+            </div>
+            <div class="preview-num-row">
+              <div class="pfield"><input data-pf="amount" type="number" value="${it.amount}"></div>
+              <div class="pfield unit-field"><input data-pf="unit" value="${it.unit}"></div>
+              <div class="pfield"><span>kcal</span><input data-pf="kcal" type="number" value="${it.kcal}"></div>
+              <div class="pfield"><span>P</span><input data-pf="p" type="number" value="${it.p}"></div>
+              <div class="pfield"><span>F</span><input data-pf="f" type="number" value="${it.f}"></div>
+              <div class="pfield"><span>C</span><input data-pf="c" type="number" value="${it.c}"></div>
+            </div>
           </div>`).join("")}
         </div>
         <div style="display:flex;gap:8px;margin-top:14px;">
-          <button class="btn-ghost" id="paste-back-btn">戻る</button>
-          <button class="btn-primary" id="paste-confirm-btn" style="flex:1;justify-content:center;" ${preview.length===0?'disabled':''}>この内容を追加</button>
+          <button class="btn-ghost" data-act="paste-back">戻る</button>
+          <button class="btn-primary" data-act="paste-confirm" style="flex:1;justify-content:center;" ${preview.length===0?'disabled':''}>この内容を追加</button>
         </div>
       `}
     </div>
@@ -617,38 +659,39 @@ function onClick(e){
       render();
       break;
     }
-  }
-
-  if(btn.id==="paste-parse-btn"){
-    const text = document.getElementById("paste-text").value;
-    const parsed = parseChatGPTText(text);
-    state.ui.pastePreview = parsed;
-    render();
-  }
-  if(btn.id==="paste-back-btn"){ state.ui.pastePreview=null; render(); }
-  if(btn.id==="paste-confirm-btn"){
-    const mealSel = document.getElementById("paste-meal-select");
-    const mk = mealSel ? mealSel.value : state.ui.pasteMeal;
-    if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
-    for(const it of state.ui.pastePreview){
-      state.day.meals[mk].push(makeItem(it.name, it.amount, it.unit, it.kcal, it.p, it.f, it.c));
+    case "paste-parse": {
+      const text = document.getElementById("paste-text").value;
+      state.ui.pastePreview = parseChatGPTText(text);
+      render();
+      break;
     }
-    saveDay();
-    state.ui.showPasteModal=false; state.ui.pastePreview=null;
-    render();
-    showToast("メニューに追加しました");
-  }
-  if(btn.id==="save-settings-btn"){
-    state.settings = {
-      targetKcal: parseFloat(document.getElementById("set-kcal").value)||0,
-      targetP: parseFloat(document.getElementById("set-p").value)||0,
-      targetF: parseFloat(document.getElementById("set-f").value)||0,
-      targetSteps: parseFloat(document.getElementById("set-steps").value)||0,
-    };
-    saveSettings();
-    state.ui.showSettings=false;
-    render();
-    showToast("目標を保存しました");
+    case "paste-back": state.ui.pastePreview=null; render(); break;
+    case "paste-confirm": {
+      const mealSel = document.getElementById("paste-meal-select");
+      const mk = mealSel ? mealSel.value : state.ui.pasteMeal;
+      if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
+      for(const it of state.ui.pastePreview){
+        state.day.meals[mk].push(makeItem(it.name, it.amount, it.unit, it.kcal, it.p, it.f, it.c));
+      }
+      saveDay();
+      state.ui.showPasteModal=false; state.ui.pastePreview=null;
+      render();
+      showToast("メニューに追加しました");
+      break;
+    }
+    case "save-settings": {
+      state.settings = {
+        targetKcal: parseFloat(document.getElementById("set-kcal").value)||0,
+        targetP: parseFloat(document.getElementById("set-p").value)||0,
+        targetF: parseFloat(document.getElementById("set-f").value)||0,
+        targetSteps: parseFloat(document.getElementById("set-steps").value)||0,
+      };
+      saveSettings();
+      state.ui.showSettings=false;
+      render();
+      showToast("目標を保存しました");
+      break;
+    }
   }
 }
 function readForm(form){
@@ -657,6 +700,18 @@ function readForm(form){
 }
 function onChange(e){
   const el = e.target;
+
+  const prevRow = el.closest(".preview-row");
+  if(prevRow && el.dataset.pf){
+    const idx = parseInt(prevRow.dataset.idx,10);
+    const it = state.ui.pastePreview[idx];
+    if(it){
+      const pf = el.dataset.pf;
+      it[pf] = (pf==="name"||pf==="unit") ? el.value : (parseFloat(el.value)||0);
+    }
+    return;
+  }
+
   const row = el.closest("[data-meal]");
   if(!row) return;
   const mealKey = row.dataset.meal, itemId = row.dataset.item;
