@@ -15,9 +15,8 @@ const ICON = {
   reset: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`,
   edit: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>`,
   paste: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>`,
-  footprints: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 9c.03-1.5 1.5-3 3.42-3C8.65 6 10 8.5 10 10.5c0 1.5-1 2.5-1 3.5v2h-5z"/><path d="M20 20v-2.38c0-2.12-1.03-3.12-1-4.62.03-1.5 1.5-3 3.42-3" style="display:none"/><path d="M14 16v-2.38C14 11.5 12.97 10.5 13 9c.03-1.5 1.5-3 3.42-3C18.65 6 20 8.5 20 10.5c0 1.5-1 2.5-1 3.5v2h-5z" transform="translate(0,4)"/></svg>`,
+  footprints: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 9c.03-1.5 1.5-3 3.42-3C8.65 6 10 8.5 10 10.5c0 1.5-1 2.5-1 3.5v2h-5z"/><path d="M14 16v-2.38C14 11.5 12.97 10.5 13 9c.03-1.5 1.5-3 3.42-3C18.65 6 20 8.5 20 10.5c0 1.5-1 2.5-1 3.5v2h-5z" transform="translate(0,4)"/></svg>`,
   dumbbell: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11"/><path d="M21 21l-1-1M4 4l-1-1"/><path d="M3.5 8.5l3-3M17.5 20.5l3-3"/><path d="M5.5 5.5l3 3M15.5 15.5l3 3"/></svg>`,
-  loader: s=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>`,
 };
 
 /* ---------- storage helpers ---------- */
@@ -27,18 +26,13 @@ const LS = {
 };
 
 /* ---------- constants ---------- */
-const MEAL_META = {
-  breakfast:{label:"朝食", eyebrow:"MORNING"},
-  lunch:{label:"昼食", eyebrow:"MIDDAY"},
-  snack:{label:"間食", eyebrow:"IF HUNGRY"},
-  dinner:{label:"夕食", eyebrow:"EVENING"},
-};
-const MEAL_ORDER = ["breakfast","lunch","snack","dinner"];
 const DEFAULT_SETTINGS = { targetKcal:1800, targetP:135, targetF:45, targetSteps:8000 };
 const UNITS = ["g","ml","個","本","杯","パック","枚","切れ"];
+const RICE_RE = /ご飯|ライス|米/;
+const MAIN_DISH_RE = /肉|魚|卵|たまご|玉子|ハラミ|マグロ|鶏|牛|豚|鮭|サーモン|タラ|エビ|海老|イカ|タコ|豆腐|納豆|プロテイン|ササミ|ヒレ|ロース|むね/;
 
 let _idc = 1;
-const nid = () => `it_${Date.now()}_${_idc++}`;
+const nid = () => `id_${Date.now()}_${_idc++}`;
 
 function makeItem(name, amount, unit, kcal, p, f, c, checked=false){
   amount = amount || 1;
@@ -48,43 +42,51 @@ function makeItem(name, amount, unit, kcal, p, f, c, checked=false){
     checked,
   };
 }
+function makeSection(label, items){ return { key: nid(), label, items: items||[] }; }
 
 function defaultTemplate(){
-  return {
-    breakfast:[
+  return [
+    makeSection("朝食", [
       makeItem("バナナ",1,"本",90,1,0,23),
       makeItem("無脂肪・無糖ヨーグルト",100,"g",40,4,0,4),
       makeItem("ホエイプロテイン",1,"杯",110,24,1,3),
       makeItem("調製豆乳",200,"ml",73,1,4,10),
-    ],
-    lunch:[
+    ]),
+    makeSection("昼食", [
       makeItem("3割もち麦ご飯",150,"g",240,4,1,53),
       makeItem("鶏むね肉",100,"g",165,31,4,0),
       makeItem("納豆",1,"パック",90,8,5,6),
       makeItem("豆腐・なめこの味噌汁",1,"杯",20,4,1,2),
-    ],
-    snack:[
+    ]),
+    makeSection("間食", [
       makeItem("バナナ半分",0.5,"本",45,0.5,0,11.5),
       makeItem("ヨーグルト",100,"g",40,4,0,4),
       makeItem("ブラックコーヒー",1,"杯",5,0,0,0),
       makeItem("お茶",1,"杯",0,0,0,0),
-    ],
-    dinner:[
+    ]),
+    makeSection("夕食", [
       makeItem("3割もち麦ご飯",330,"g",528,9,2,117),
       makeItem("マグロたたき",100,"g",125,26,1,0),
       makeItem("ハラミ",50,"g",206,8,19,0),
       makeItem("ゆで卵",1,"個",78,7,5,1),
       makeItem("ブロッコリー",100,"g",33,4,1,5),
-    ],
-  };
+    ]),
+  ];
 }
 
-function cloneMeals(meals, resetChecked){
-  const out = {};
-  for(const k of MEAL_ORDER){
-    out[k] = (meals[k]||[]).map(it=>({...it, id:nid(), checked: resetChecked ? false : it.checked}));
-  }
-  return out;
+function cloneSections(sections, resetChecked){
+  return sections.map(sec => makeSection(
+    sec.label,
+    sec.items.map(it => ({ ...it, id: nid(), checked: resetChecked ? false : it.checked }))
+  ));
+}
+
+// migrate old fixed-key format ({breakfast:[...],lunch:[...],...}) to the new array-of-sections format
+function migrateMealsIfNeeded(meals){
+  if(!meals) return meals;
+  if(Array.isArray(meals)) return meals;
+  const order = [["breakfast","朝食"],["lunch","昼食"],["snack","間食"],["dinner","夕食"]];
+  return order.filter(([k]) => meals[k]).map(([k,label]) => makeSection(label, (meals[k]||[]).map(it=>({...it}))));
 }
 
 /* ---------- date helpers ---------- */
@@ -98,19 +100,25 @@ const isToday = d => dateKey(d)===dateKey(new Date());
 const state = {
   date: new Date(),
   settings: LS.get("pfc_settings", DEFAULT_SETTINGS),
-  template: LS.get("pfc_template", null),
+  template: migrateMealsIfNeeded(LS.get("pfc_template", null)),
   day: null,
-  ui: { showSettings:false, showTemplateEditor:false, showPasteModal:false, addingTo:null, toast:null, pastePreview:null, pasteMeal:"breakfast" },
+  ui: { showSettings:false, showTemplateEditor:false, showPasteModal:false, showTmplPasteModal:false,
+        addingTo:null, addingSection:false, toast:null, pastePreview:null, pasteMeal:null, tmplPastePreview:null },
 };
-if(!state.template){ state.template = defaultTemplate(); LS.set("pfc_template", state.template); }
+if(!state.template || state.template.length===0){ state.template = defaultTemplate(); LS.set("pfc_template", state.template); }
 
 function loadDay(){
-  const d = LS.get(`pfc_day_${dateKey(state.date)}`, null);
-  state.day = d;
+  const raw = LS.get(`pfc_day_${dateKey(state.date)}`, null);
+  if(!raw){ state.day = null; return; }
+  state.day = { meals: migrateMealsIfNeeded(raw.meals)||[], steps: raw.steps!=null?raw.steps:null, strengthNotes: raw.strengthNotes||"" };
 }
 function saveDay(){ if(state.day) LS.set(`pfc_day_${dateKey(state.date)}`, state.day); }
 function saveSettings(){ LS.set("pfc_settings", state.settings); }
 function saveTemplate(){ LS.set("pfc_template", state.template); }
+function ensureDay(){
+  if(!state.day) state.day = { meals: cloneSections(state.template, true), steps:null, strengthNotes:"" };
+}
+function findSection(sections, key){ return sections.find(s=>s.key===key); }
 
 let toastTimer=null;
 function showToast(msg){
@@ -120,7 +128,7 @@ function showToast(msg){
   toastTimer = setTimeout(()=>{ state.ui.toast=null; render(); }, 2200);
 }
 
-/* ---------- actions ---------- */
+/* ---------- actions: date & day lifecycle ---------- */
 function changeDate(delta){
   const d = new Date(state.date);
   d.setDate(d.getDate()+delta);
@@ -132,7 +140,7 @@ function goToday(){ state.date = new Date(); loadDay(); render(); }
 
 function applyTemplateToDay(){
   state.day = {
-    meals: cloneMeals(state.template, true),
+    meals: cloneSections(state.template, true),
     steps: state.day ? state.day.steps : null,
     strengthNotes: state.day ? state.day.strengthNotes : "",
   };
@@ -141,10 +149,11 @@ function applyTemplateToDay(){
 }
 function copyYesterday(){
   const y = new Date(state.date); y.setDate(y.getDate()-1);
-  const yd = LS.get(`pfc_day_${dateKey(y)}`, null);
-  if(!yd){ showToast("前日のデータがありません"); return; }
+  const raw = LS.get(`pfc_day_${dateKey(y)}`, null);
+  if(!raw){ showToast("前日のデータがありません"); return; }
+  const yMeals = migrateMealsIfNeeded(raw.meals)||[];
   state.day = {
-    meals: cloneMeals(yd.meals, true),
+    meals: cloneSections(yMeals, true),
     steps: state.day ? state.day.steps : null,
     strengthNotes: state.day ? state.day.strengthNotes : "",
   };
@@ -153,16 +162,16 @@ function copyYesterday(){
 }
 function saveCurrentAsTemplate(){
   if(!state.day){ showToast("先にメニューを作成してください"); return; }
-  state.template = cloneMeals(state.day.meals, true);
+  state.template = cloneSections(state.day.meals, true);
   saveTemplate();
   showToast("現在のメニューをテンプレートとして保存しました");
 }
 
-function updateAmount(mealKey, itemId, newAmount){
+/* ---------- actions: day items ---------- */
+function updateAmount(sectionKey, itemId, newAmount){
   if(isNaN(newAmount) || newAmount<0) return;
-  const items = state.day.meals[mealKey];
-  const it = items.find(x=>x.id===itemId);
-  if(!it) return;
+  const sec = findSection(state.day.meals, sectionKey); if(!sec) return;
+  const it = sec.items.find(x=>x.id===itemId); if(!it) return;
   const pu = it.perUnit;
   it.amount = newAmount;
   it.kcal = round0(pu.kcal*newAmount);
@@ -171,123 +180,139 @@ function updateAmount(mealKey, itemId, newAmount){
   it.c = round1(pu.c*newAmount);
   saveDay(); render();
 }
-function toggleChecked(mealKey, itemId){
-  const it = state.day.meals[mealKey].find(x=>x.id===itemId);
-  if(!it) return;
+function toggleChecked(sectionKey, itemId){
+  const sec = findSection(state.day.meals, sectionKey); if(!sec) return;
+  const it = sec.items.find(x=>x.id===itemId); if(!it) return;
   it.checked = !it.checked;
   saveDay(); render();
 }
-function deleteItem(mealKey, itemId){
-  state.day.meals[mealKey] = state.day.meals[mealKey].filter(x=>x.id!==itemId);
+function deleteItem(sectionKey, itemId){
+  const sec = findSection(state.day.meals, sectionKey); if(!sec) return;
+  sec.items = sec.items.filter(x=>x.id!==itemId);
   saveDay(); render();
 }
-function renameItem(mealKey, itemId, name){
-  const it = state.day.meals[mealKey].find(x=>x.id===itemId);
+function renameItem(sectionKey, itemId, name){
+  const sec = findSection(state.day.meals, sectionKey); if(!sec) return;
+  const it = sec.items.find(x=>x.id===itemId);
   if(it){ it.name = name||it.name; saveDay(); }
 }
-function addItemToDay(mealKey, form){
+function addItemToDay(sectionKey, form){
   const amount = parseFloat(form.amount)||1;
   const kcal = parseFloat(form.kcal)||0;
   const p = parseFloat(form.p)||0;
   const f = parseFloat(form.f)||0;
   const c = parseFloat(form.c)||0;
   const item = makeItem(form.name||"新しい項目", amount, form.unit||"g", kcal,p,f,c);
-  if(!state.day) state.day = { meals:{breakfast:[],lunch:[],snack:[],dinner:[]}, steps:null, strengthNotes:"" };
-  state.day.meals[mealKey].push(item);
+  ensureDay();
+  const sec = findSection(state.day.meals, sectionKey);
+  if(sec) sec.items.push(item);
   state.ui.addingTo = null;
   saveDay(); render();
 }
 
-const RICE_RE = /ご飯|ライス|米/;
-const MAIN_DISH_RE = /肉|魚|卵|たまご|玉子|ハラミ|マグロ|鶏|牛|豚|鮭|サーモン|エビ|海老|イカ|タコ|豆腐|納豆|プロテイン|ササミ|ヒレ|ロース|むね/;
-
-function applyFactorToItems(items, factor){
-  for(const {mealKey,item} of items){
-    const pu = item.perUnit;
-    const newAmount = Math.max(0, round1(item.amount*factor));
-    item.amount = newAmount;
-    item.kcal = round0(pu.kcal*newAmount);
-    item.p = round1(pu.p*newAmount);
-    item.f = round1(pu.f*newAmount);
-    item.c = round1(pu.c*newAmount);
+/* ---------- auto-adjust: prioritize rice / main-dish items ---------- */
+function applyFactorToItemRefs(itemRefs, factor){
+  for(const it of itemRefs){
+    const pu = it.perUnit;
+    const newAmount = Math.max(0, round1(it.amount*factor));
+    it.amount = newAmount;
+    it.kcal = round0(pu.kcal*newAmount);
+    it.p = round1(pu.p*newAmount);
+    it.f = round1(pu.f*newAmount);
+    it.c = round1(pu.c*newAmount);
   }
 }
-
 function adjustToRemaining(){
   if(!state.day) return;
   let consumedKcal=0;
-  for(const k of MEAL_ORDER) for(const it of state.day.meals[k]) if(it.checked) consumedKcal += it.kcal;
+  for(const sec of state.day.meals) for(const it of sec.items) if(it.checked) consumedKcal += it.kcal;
   const budget = Math.max(0, state.settings.targetKcal - consumedKcal);
 
-  // classify unchecked items: priority = rice / main-dish (protein sources), rest = fixed
-  const priority = [];
-  const fixed = [];
-  for(const k of MEAL_ORDER){
-    for(const it of state.day.meals[k]){
+  const priority = [], fixed = [];
+  for(const sec of state.day.meals){
+    for(const it of sec.items){
       if(it.checked) continue;
-      if(RICE_RE.test(it.name) || MAIN_DISH_RE.test(it.name)) priority.push({mealKey:k, item:it});
-      else fixed.push({mealKey:k, item:it});
+      if(RICE_RE.test(it.name) || MAIN_DISH_RE.test(it.name)) priority.push(it);
+      else fixed.push(it);
     }
   }
 
   if(priority.length===0 && fixed.length===0){ showToast("調整できる未摂取の項目がありません"); return; }
 
   if(priority.length===0){
-    // no rice/main-dish items found among unchecked -> fall back to adjusting everything
-    const sum = fixed.reduce((s,a)=>s+a.item.kcal,0);
+    const sum = fixed.reduce((s,it)=>s+it.kcal,0);
     if(sum<=0){ showToast("調整できる未摂取の項目がありません"); return; }
-    applyFactorToItems(fixed, budget/sum);
+    applyFactorToItemRefs(fixed, budget/sum);
     saveDay(); render();
     showToast(`残り ${round0(budget)}kcal に合わせて未摂取分を調整しました`);
     return;
   }
 
-  const fixedSum = fixed.reduce((s,a)=>s+a.item.kcal,0);
-  const prioritySum = priority.reduce((s,a)=>s+a.item.kcal,0);
+  const fixedSum = fixed.reduce((s,it)=>s+it.kcal,0);
+  const prioritySum = priority.reduce((s,it)=>s+it.kcal,0);
   let targetForPriority = budget - fixedSum;
-  // keep adjustment within a sane range (15%〜300% of the original rice/main-dish total)
   const minAllowed = prioritySum*0.15;
   const maxAllowed = prioritySum*3;
   targetForPriority = Math.min(maxAllowed, Math.max(minAllowed, targetForPriority));
 
-  applyFactorToItems(priority, prioritySum>0 ? targetForPriority/prioritySum : 1);
+  applyFactorToItemRefs(priority, prioritySum>0 ? targetForPriority/prioritySum : 1);
   saveDay(); render();
   showToast(`ご飯・おかずを中心に、残り${round0(budget)}kcalに合わせて調整しました`);
 }
 
+/* ---------- setSteps / notes ---------- */
 function setSteps(v){
-  if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
+  ensureDay();
   state.day.steps = v===""||v==null ? null : Math.max(0, parseInt(v,10)||0);
   saveDay();
 }
 function addSteps(delta){
-  if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
+  ensureDay();
   state.day.steps = Math.max(0,(state.day.steps||0)+delta);
   saveDay(); render();
 }
-function setNotes(v){
-  if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
-  state.day.strengthNotes = v;
-  saveDay();
-}
+function setNotes(v){ ensureDay(); state.day.strengthNotes = v; saveDay(); }
 
-/* ---- template editor actions ---- */
-function tmplUpdateAmount(mealKey,itemId,newAmount){
+/* ---------- template editor actions ---------- */
+function tmplUpdateAmount(sectionKey,itemId,newAmount){
   if(isNaN(newAmount)||newAmount<0) return;
-  const it = state.template[mealKey].find(x=>x.id===itemId); if(!it) return;
+  const sec = findSection(state.template, sectionKey); if(!sec) return;
+  const it = sec.items.find(x=>x.id===itemId); if(!it) return;
   const pu = it.perUnit;
   it.amount=newAmount; it.kcal=round0(pu.kcal*newAmount); it.p=round1(pu.p*newAmount); it.f=round1(pu.f*newAmount); it.c=round1(pu.c*newAmount);
   saveTemplate(); render();
 }
-function tmplDeleteItem(mealKey,itemId){ state.template[mealKey]=state.template[mealKey].filter(x=>x.id!==itemId); saveTemplate(); render(); }
-function tmplRename(mealKey,itemId,name){ const it=state.template[mealKey].find(x=>x.id===itemId); if(it){it.name=name||it.name; saveTemplate();} }
-function tmplAddItem(mealKey, form){
+function tmplDeleteItem(sectionKey,itemId){
+  const sec = findSection(state.template, sectionKey); if(!sec) return;
+  sec.items = sec.items.filter(x=>x.id!==itemId);
+  saveTemplate(); render();
+}
+function tmplRename(sectionKey,itemId,name){
+  const sec = findSection(state.template, sectionKey); if(!sec) return;
+  const it=sec.items.find(x=>x.id===itemId); if(it){it.name=name||it.name; saveTemplate();}
+}
+function tmplAddItem(sectionKey, form){
   const amount=parseFloat(form.amount)||1, kcal=parseFloat(form.kcal)||0, p=parseFloat(form.p)||0, f=parseFloat(form.f)||0, c=parseFloat(form.c)||0;
-  state.template[mealKey].push(makeItem(form.name||"新しい項目",amount,form.unit||"g",kcal,p,f,c));
+  const sec = findSection(state.template, sectionKey); if(!sec) return;
+  sec.items.push(makeItem(form.name||"新しい項目",amount,form.unit||"g",kcal,p,f,c));
   state.ui.addingTo=null; saveTemplate(); render();
 }
+function tmplRenameSection(sectionKey, label){
+  const sec = findSection(state.template, sectionKey); if(!sec) return;
+  sec.label = label || sec.label;
+  saveTemplate();
+}
+function tmplDeleteSection(sectionKey){
+  state.template = state.template.filter(s=>s.key!==sectionKey);
+  saveTemplate(); render();
+}
+function tmplAddSection(label){
+  state.template.push(makeSection(label||"新しい区分", []));
+  state.ui.addingSection = false;
+  saveTemplate(); render();
+}
 
-/* ---- ChatGPT paste parser ---- */
+/* ---- ChatGPT / AI suggestion text parser (single-meal, used by the day-level paste modal) ---- */
 function parseChatGPTText(text){
   const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>0 && /\d/.test(l));
   return lines.map(parseLine).filter(it=>it.name);
@@ -310,31 +335,50 @@ function parseLine(line){
   m = name.match(/C[:：]?\s*(\d+(?:\.\d+)?)/i) || name.match(/炭水化物[:：]?\s*(\d+(?:\.\d+)?)/);
   if(m){ c=parseFloat(m[1]); name=name.replace(m[0],""); }
 
-  name = name.replace(/[()（）,、:：·・]+/g," ").replace(/\s+/g," ").trim();
+  name = name.replace(/約/g,"").replace(/[()（）,、:：·・]+/g," ").replace(/\s+/g,' ').trim();
   if(!name) name="新しい項目";
   if(amount==null){ amount=1; unit=unit||"個"; }
   return { name, amount, unit: unit||"g", kcal: kcal||0, p: p||0, f: f||0, c: c||0 };
 }
 function guessMealByTime(){
   const h = new Date().getHours();
-  if(h<10) return "breakfast";
-  if(h<15) return "lunch";
-  if(h<18) return "snack";
-  return "dinner";
+  if(h<10) return 0;
+  if(h<15) return 1;
+  if(h<18) return 2;
+  return 3;
+}
+
+/* ---- multi-section template parser: turns a full-day AI plan into sections ---- */
+function parseTemplateText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+  const sections = [];
+  let current = null;
+  for(const raw of lines){
+    if(/^[⸻\-=_*ー]{2,}$/.test(raw)) continue;      // separator lines
+    if(/合計/.test(raw)) continue;                    // per-section / daily totals
+    if(/^[・\-\*•]/.test(raw)){
+      if(!current){ current = makeSection("メニュー", []); sections.push(current); }
+      const it = parseLine(raw);
+      if(it.name) current.items.push(it);
+    } else {
+      current = makeSection(raw.replace(/[:：]\s*$/,""), []);
+      sections.push(current);
+    }
+  }
+  return sections.filter(s=>s.items.length>0);
 }
 
 /* ---------- totals ---------- */
 function computeTotals(){
-  const consumed={kcal:0,p:0,f:0,c:0}, planned={kcal:0,p:0,f:0,c:0};
+  const consumed={kcal:0,p:0,f:0,c:0};
   if(state.day){
-    for(const k of MEAL_ORDER){
-      for(const it of state.day.meals[k]||[]){
-        planned.kcal+=it.kcal; planned.p+=it.p; planned.f+=it.f; planned.c+=it.c;
+    for(const sec of state.day.meals){
+      for(const it of sec.items){
         if(it.checked){ consumed.kcal+=it.kcal; consumed.p+=it.p; consumed.f+=it.f; consumed.c+=it.c; }
       }
     }
   }
-  return {consumed, planned};
+  return { consumed };
 }
 function targetCarb(){
   const kcalFromPF = state.settings.targetP*4 + state.settings.targetF*9;
@@ -373,7 +417,6 @@ function render(){
     </div>
   </div>`;
 
-  // summary
   html += `<div style="padding:12px 16px;">
     <div class="summary-card">
       <div class="summary-top">
@@ -405,7 +448,6 @@ function render(){
     </div>
   </div>`;
 
-  // meals
   html += `<div class="meal-list">`;
   if(!state.day){
     html += `<div class="meal-card empty-card">
@@ -417,24 +459,22 @@ function render(){
       </div>
     </div>`;
   } else {
-    for(const mealKey of MEAL_ORDER){
-      const items = state.day.meals[mealKey]||[];
-      const sum = items.reduce((a,it)=>({kcal:a.kcal+it.kcal}),{kcal:0});
+    for(const sec of state.day.meals){
+      const sumKcal = sec.items.reduce((a,it)=>a+it.kcal,0);
       html += `<div class="meal-card">
         <div class="meal-head">
-          <div><div class="eyebrow">${MEAL_META[mealKey].eyebrow}</div><div class="meal-name">${MEAL_META[mealKey].label}</div></div>
-          <div class="meal-sum num">約${round0(sum.kcal)}kcal</div>
+          <div><div class="meal-name">${esc(sec.label)}</div></div>
+          <div class="meal-sum num">約${round0(sumKcal)}kcal</div>
         </div>
         <div class="item-list">
-          ${items.length===0 ? `<div style="padding:14px 16px;font-size:12.5px;color:#7A7867;">項目がありません</div>` : items.map(it=>itemRowHtml(mealKey,it)).join("")}
+          ${sec.items.length===0 ? `<div style="padding:14px 16px;font-size:12.5px;color:#7A7867;">項目がありません</div>` : sec.items.map(it=>itemRowHtml(sec.key,it)).join("")}
         </div>
-        ${state.ui.addingTo===mealKey ? addFormHtml(mealKey,"day") : `<button class="add-row-btn" data-act="start-add" data-meal="${mealKey}">${ICON.plus(14)} 項目を追加</button>`}
+        ${state.ui.addingTo===sec.key ? addFormHtml(sec.key,"day") : `<button class="add-row-btn" data-act="start-add" data-meal="${sec.key}">${ICON.plus(14)} 項目を追加</button>`}
       </div>`;
     }
   }
   html += `</div>`;
 
-  // steps + strength notes
   const steps = state.day ? (state.day.steps||0) : 0;
   const stepsPct = pct(steps, state.settings.targetSteps);
   html += `<div style="padding:0 16px;">
@@ -462,15 +502,16 @@ function render(){
   if(state.ui.showSettings) html += settingsSheetHtml(tC);
   if(state.ui.showTemplateEditor) html += templateEditorHtml();
   if(state.ui.showPasteModal) html += pasteModalHtml();
+  if(state.ui.showTmplPasteModal) html += tmplPasteModalHtml();
   if(state.ui.toast) html += `<div class="toast">${esc(state.ui.toast)}</div>`;
 
   root.innerHTML = html;
   bindDynamic();
 }
 
-function itemRowHtml(mealKey, it){
+function itemRowHtml(sectionKey, it){
   const step = (it.unit==="g"||it.unit==="ml") ? 10 : (it.unit==="個"||it.unit==="パック") ? 1 : 0.5;
-  return `<div class="item-row ${it.checked?'checked':''}" data-meal="${mealKey}" data-item="${it.id}">
+  return `<div class="item-row ${it.checked?'checked':''}" data-meal="${sectionKey}" data-item="${it.id}">
     <div class="chk ${it.checked?'on':''}" data-act="toggle-check">${it.checked?ICON.check(14):''}</div>
     <div class="item-main">
       <input class="item-name-input" data-field="item-name" style="border:none;background:transparent;font-size:13.5px;font-weight:500;width:100%;padding:0;font-family:'Noto Sans JP',sans-serif;${it.checked?'text-decoration:line-through;color:#7A7867;':''}" value="${esc(it.name)}">
@@ -486,8 +527,8 @@ function itemRowHtml(mealKey, it){
   </div>`;
 }
 
-function addFormHtml(mealKey, scope){
-  return `<div class="inline-form" data-meal="${mealKey}" data-scope="${scope}">
+function addFormHtml(sectionKey, scope){
+  return `<div class="inline-form" data-meal="${sectionKey}" data-scope="${scope}">
     <div class="form-grid3">
       <input class="form-input" placeholder="食材名" data-f="name">
       <input class="form-input num" placeholder="量" type="number" value="100" data-f="amount">
@@ -529,27 +570,42 @@ function settingsSheetHtml(tC){
 
 function templateEditorHtml(){
   let inner = "";
-  for(const mealKey of MEAL_ORDER){
-    const items = state.template[mealKey]||[];
-    inner += `<div class="tmpl-meal">
-      <div class="tmpl-meal-title">${MEAL_META[mealKey].label}</div>
-      <div class="item-list" style="border-top:1px solid #E3DFD1;border-radius:10px;overflow:hidden;">
-        ${items.map(it=>tmplItemRowHtml(mealKey,it)).join("") || `<div style="padding:12px;font-size:12px;color:#7A7867;background:#fff;">項目がありません</div>`}
+  for(const sec of state.template){
+    inner += `<div class="tmpl-meal" data-meal="${sec.key}">
+      <div class="tmpl-meal-head">
+        <input class="tmpl-title-input" data-field="section-label" value="${esc(sec.label)}">
+        <button class="del-btn" data-act="delete-section">${ICON.trash(14)}</button>
       </div>
-      ${state.ui.addingTo===("tmpl:"+mealKey) ? addFormHtml(mealKey,"tmpl") : `<button class="add-row-btn" style="border-radius:0 0 10px 10px;" data-act="start-add-tmpl" data-meal="${mealKey}">${ICON.plus(14)} 項目を追加</button>`}
+      <div class="item-list" style="border-top:1px solid #E3DFD1;border-radius:10px;overflow:hidden;">
+        ${sec.items.map(it=>tmplItemRowHtml(sec.key,it)).join("") || `<div style="padding:12px;font-size:12px;color:#7A7867;background:#fff;">項目がありません</div>`}
+      </div>
+      ${state.ui.addingTo===("tmpl:"+sec.key) ? addFormHtml(sec.key,"tmpl") : `<button class="add-row-btn" style="border-radius:0 0 10px 10px;" data-act="start-add-tmpl" data-meal="${sec.key}">${ICON.plus(14)} 項目を追加</button>`}
     </div>`;
   }
   return `<div class="sheet-overlay" data-act="close-overlay" data-which="template">
     <div class="sheet">
       <div class="sheet-head"><div class="sheet-title">テンプレート編集</div><button class="close-btn" data-act="close-template">${ICON.x(18)}</button></div>
-      <div style="font-size:12px;color:#7A7867;margin-bottom:14px;">ここで編集した内容が「テンプレート適用」ボタンの基本メニューになります。</div>
+      <div style="font-size:12px;color:#7A7867;margin-bottom:14px;">ここで編集した内容が「テンプレート適用」ボタンの基本メニューになります。食事区分の名前も自由に変更できます。</div>
+
+      <button class="btn-ghost" data-act="paste-template" style="width:100%;justify-content:center;margin-bottom:16px;padding:10px;">${ICON.paste(14)} AIの提案を貼り付けてテンプレートを作成</button>
+
       ${inner}
+
+      ${state.ui.addingSection ? `
+        <div class="inline-form" style="margin-top:4px;">
+          <input class="form-input" id="new-section-name" placeholder="区分名(例: 筋トレ後)" style="margin-bottom:8px;">
+          <div class="form-actions">
+            <button class="btn-ghost" data-act="cancel-add-section">キャンセル</button>
+            <button class="btn-primary" data-act="confirm-add-section">追加</button>
+          </div>
+        </div>
+      ` : `<button class="btn-ghost" data-act="start-add-section" style="width:100%;justify-content:center;margin-top:4px;">${ICON.plus(14)} 食事区分を追加</button>`}
     </div>
   </div>`;
 }
-function tmplItemRowHtml(mealKey, it){
+function tmplItemRowHtml(sectionKey, it){
   const step = (it.unit==="g"||it.unit==="ml") ? 10 : (it.unit==="個"||it.unit==="パック") ? 1 : 0.5;
-  return `<div class="item-row" style="background:#fff;" data-meal="${mealKey}" data-item="${it.id}" data-tmpl="1">
+  return `<div class="item-row" style="background:#fff;" data-meal="${sectionKey}" data-item="${it.id}" data-tmpl="1">
     <div class="item-main">
       <input class="item-name-input" data-field="tmpl-name" style="border:none;background:transparent;font-size:13.5px;font-weight:500;width:100%;padding:0;font-family:'Noto Sans JP',sans-serif;" value="${esc(it.name)}">
       <div class="item-meta num">${it.kcal}kcal · P${it.p} F${it.f} C${it.c}</div>
@@ -564,8 +620,24 @@ function tmplItemRowHtml(mealKey, it){
   </div>`;
 }
 
+function previewNumRowHtml(it, idx){
+  return `<div class="preview-name-row">
+    <input data-pf="name" value="${esc(it.name)}">
+    <button class="del-btn" data-act="paste-del-row" data-idx="${idx}">${ICON.x(14)}</button>
+  </div>
+  <div class="preview-num-row">
+    <div class="pfield"><input data-pf="amount" type="number" value="${it.amount}"></div>
+    <div class="pfield unit-field"><input data-pf="unit" value="${it.unit}"></div>
+    <div class="pfield"><span>kcal</span><input data-pf="kcal" type="number" value="${it.kcal}"></div>
+    <div class="pfield"><span>P</span><input data-pf="p" type="number" value="${it.p}"></div>
+    <div class="pfield"><span>F</span><input data-pf="f" type="number" value="${it.f}"></div>
+    <div class="pfield"><span>C</span><input data-pf="c" type="number" value="${it.c}"></div>
+  </div>`;
+}
+
 function pasteModalHtml(){
   const preview = state.ui.pastePreview;
+  const daySections = state.day ? state.day.meals : state.template;
   return `<div class="sheet-overlay" data-act="close-overlay" data-which="paste">
     <div class="sheet">
       <div class="sheet-head"><div class="sheet-title">提案を貼り付けて反映</div><button class="close-btn" data-act="close-paste">${ICON.x(18)}</button></div>
@@ -576,28 +648,47 @@ function pasteModalHtml(){
       ` : `
         <label class="field-label">追加する食事</label>
         <select id="paste-meal-select" class="meal-select" style="margin-bottom:12px;">
-          ${MEAL_ORDER.map(k=>`<option value="${k}" ${state.ui.pasteMeal===k?'selected':''}>${MEAL_META[k].label}</option>`).join("")}
+          ${daySections.map((s,i)=>`<option value="${s.key}" ${state.ui.pasteMeal===i?'selected':''}>${esc(s.label)}</option>`).join("")}
         </select>
         <div style="max-height:38vh;overflow-y:auto;">
-          ${preview.length===0 ? `<div style="font-size:12.5px;color:#7A7867;padding:8px 0;">解析できる項目が見つかりませんでした。テキストを見直してください。</div>` : preview.map((it,i)=>`
-          <div class="preview-row" data-idx="${i}">
-            <div class="preview-name-row">
-              <input data-pf="name" value="${esc(it.name)}">
-              <button class="del-btn" data-act="paste-del-row" data-idx="${i}">${ICON.x(14)}</button>
-            </div>
-            <div class="preview-num-row">
-              <div class="pfield"><input data-pf="amount" type="number" value="${it.amount}"></div>
-              <div class="pfield unit-field"><input data-pf="unit" value="${it.unit}"></div>
-              <div class="pfield"><span>kcal</span><input data-pf="kcal" type="number" value="${it.kcal}"></div>
-              <div class="pfield"><span>P</span><input data-pf="p" type="number" value="${it.p}"></div>
-              <div class="pfield"><span>F</span><input data-pf="f" type="number" value="${it.f}"></div>
-              <div class="pfield"><span>C</span><input data-pf="c" type="number" value="${it.c}"></div>
-            </div>
-          </div>`).join("")}
+          ${preview.length===0 ? `<div style="font-size:12.5px;color:#7A7867;padding:8px 0;">解析できる項目が見つかりませんでした。テキストを見直してください。</div>` : preview.map((it,i)=>`<div class="preview-row" data-idx="${i}">${previewNumRowHtml(it,i)}</div>`).join("")}
         </div>
         <div style="display:flex;gap:8px;margin-top:14px;">
           <button class="btn-ghost" data-act="paste-back">戻る</button>
           <button class="btn-primary" data-act="paste-confirm" style="flex:1;justify-content:center;" ${preview.length===0?'disabled':''}>この内容を追加</button>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+function tmplPasteModalHtml(){
+  const preview = state.ui.tmplPastePreview;
+  return `<div class="sheet-overlay" data-act="close-overlay" data-which="tmplpaste">
+    <div class="sheet">
+      <div class="sheet-head"><div class="sheet-title">AIの提案からテンプレート作成</div><button class="close-btn" data-act="close-tmplpaste">${ICON.x(18)}</button></div>
+      ${!preview ? `
+        <div style="font-size:12px;color:#7A7867;margin-bottom:10px;">「朝」「昼」「間食」「夕食」「筋トレ後」のような見出し行と、その下に「・」付きの食材行が並ぶ形式のテキストをそのまま貼り付けてください。1日分のプランをまとめて読み取り、区分ごとに分けてテンプレートを作り直します(今のテンプレートは上書きされます)。</div>
+        <textarea class="paste-area" id="tmpl-paste-text" style="min-height:220px;" placeholder="朝&#10;・バナナ 1本 112kcal P1.4 F0.2 C28&#10;・...&#10;&#10;昼&#10;・もち麦ご飯 200g 290kcal P5.6 F0.8 C62&#10;・..."></textarea>
+        <button class="btn-primary" data-act="tmplpaste-parse" style="width:100%;justify-content:center;margin-top:12px;padding:11px;">解析してプレビュー</button>
+      ` : `
+        ${preview.length===0 ? `<div style="font-size:12.5px;color:#7A7867;padding:8px 0 14px;">区分や項目を読み取れませんでした。見出し行(朝・昼など)と「・」付きの項目行があるか確認してください。</div>` : `
+        <div style="font-size:12px;color:#7A7867;margin-bottom:10px;">${preview.length}個の区分を読み取りました。内容を確認・編集してから適用してください。</div>
+        <div style="max-height:50vh;overflow-y:auto;">
+          ${preview.map((sec,si)=>`
+            <div class="tmpl-preview-section" data-sidx="${si}">
+              <div class="tmpl-preview-head">
+                <input data-tpf="label" value="${esc(sec.label)}">
+                <button class="del-btn" data-act="tmplpaste-del-section" data-sidx="${si}">${ICON.trash(13)}</button>
+              </div>
+              ${sec.items.map((it,ii)=>`<div class="preview-row" data-sidx="${si}" data-idx="${ii}">${previewNumRowHtml(it,ii).replace('data-act="paste-del-row"', `data-act="tmplpaste-del-row" data-sidx="${si}"`)}</div>`).join("")}
+            </div>
+          `).join("")}
+        </div>
+        `}
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn-ghost" data-act="tmplpaste-back">戻る</button>
+          <button class="btn-primary" data-act="tmplpaste-confirm" style="flex:1;justify-content:center;" ${preview.length===0?'disabled':''}>このテンプレートを適用</button>
         </div>
       `}
     </div>
@@ -622,7 +713,15 @@ function onClick(e){
   switch(act){
     case "open-settings": state.ui.showSettings=true; render(); break;
     case "close-settings": state.ui.showSettings=false; render(); break;
-    case "close-overlay": if(e.target===btn){ if(btn.dataset.which==="settings") state.ui.showSettings=false; if(btn.dataset.which==="template") state.ui.showTemplateEditor=false; if(btn.dataset.which==="paste"){state.ui.showPasteModal=false; state.ui.pastePreview=null;} render(); } break;
+    case "close-overlay":
+      if(e.target===btn){
+        if(btn.dataset.which==="settings") state.ui.showSettings=false;
+        if(btn.dataset.which==="template") state.ui.showTemplateEditor=false;
+        if(btn.dataset.which==="paste"){state.ui.showPasteModal=false; state.ui.pastePreview=null;}
+        if(btn.dataset.which==="tmplpaste"){state.ui.showTmplPasteModal=false; state.ui.tmplPastePreview=null;}
+        render();
+      }
+      break;
     case "prev-day": changeDate(-1); break;
     case "next-day": changeDate(1); break;
     case "go-today": goToday(); break;
@@ -635,9 +734,9 @@ function onClick(e){
     case "close-paste": state.ui.showPasteModal=false; state.ui.pastePreview=null; render(); break;
     case "toggle-check": toggleChecked(mealKey,itemId); break;
     case "delete-item": deleteItem(mealKey,itemId); break;
-    case "qty-plus": updateAmount(mealKey,itemId, round1((state.day.meals[mealKey].find(x=>x.id===itemId).amount)+parseFloat(btn.dataset.step))); break;
-    case "qty-minus": updateAmount(mealKey,itemId, Math.max(0,round1((state.day.meals[mealKey].find(x=>x.id===itemId).amount)-parseFloat(btn.dataset.step)))); break;
-    case "start-add": state.ui.addingTo=mealKey; render(); setTimeout(()=>{ const f=root.querySelector(`.inline-form[data-meal="${mealKey}"] input`); if(f) f.focus(); },0); break;
+    case "qty-plus": updateAmount(mealKey,itemId, round1((findSection(state.day.meals,mealKey).items.find(x=>x.id===itemId).amount)+parseFloat(btn.dataset.step))); break;
+    case "qty-minus": updateAmount(mealKey,itemId, Math.max(0,round1((findSection(state.day.meals,mealKey).items.find(x=>x.id===itemId).amount)-parseFloat(btn.dataset.step)))); break;
+    case "start-add": state.ui.addingTo=mealKey; render(); break;
     case "cancel-add": state.ui.addingTo=null; render(); break;
     case "confirm-add": {
       const form = btn.closest(".inline-form");
@@ -650,9 +749,18 @@ function onClick(e){
     }
     case "start-add-tmpl": state.ui.addingTo = "tmpl:"+mealKey; render(); break;
     case "tmpl-delete-item": tmplDeleteItem(mealKey,itemId); break;
-    case "tmpl-qty-plus": tmplUpdateAmount(mealKey,itemId, round1((state.template[mealKey].find(x=>x.id===itemId).amount)+parseFloat(btn.dataset.step))); break;
-    case "tmpl-qty-minus": tmplUpdateAmount(mealKey,itemId, Math.max(0,round1((state.template[mealKey].find(x=>x.id===itemId).amount)-parseFloat(btn.dataset.step)))); break;
+    case "tmpl-qty-plus": tmplUpdateAmount(mealKey,itemId, round1((findSection(state.template,mealKey).items.find(x=>x.id===itemId).amount)+parseFloat(btn.dataset.step))); break;
+    case "tmpl-qty-minus": tmplUpdateAmount(mealKey,itemId, Math.max(0,round1((findSection(state.template,mealKey).items.find(x=>x.id===itemId).amount)-parseFloat(btn.dataset.step)))); break;
+    case "delete-section": tmplDeleteSection(mealKey); break;
+    case "start-add-section": state.ui.addingSection=true; render(); break;
+    case "cancel-add-section": state.ui.addingSection=false; render(); break;
+    case "confirm-add-section": {
+      const val = document.getElementById("new-section-name").value.trim();
+      tmplAddSection(val);
+      break;
+    }
     case "add-steps": addSteps(parseInt(btn.dataset.delta,10)); break;
+
     case "paste-del-row": {
       const idx = parseInt(btn.dataset.idx,10);
       state.ui.pastePreview.splice(idx,1);
@@ -668,10 +776,11 @@ function onClick(e){
     case "paste-back": state.ui.pastePreview=null; render(); break;
     case "paste-confirm": {
       const mealSel = document.getElementById("paste-meal-select");
-      const mk = mealSel ? mealSel.value : state.ui.pasteMeal;
-      if(!state.day) state.day = { meals: cloneMeals(state.template,true), steps:null, strengthNotes:"" };
+      ensureDay();
+      const mk = mealSel ? mealSel.value : state.day.meals[0].key;
+      const sec = findSection(state.day.meals, mk) || state.day.meals[0];
       for(const it of state.ui.pastePreview){
-        state.day.meals[mk].push(makeItem(it.name, it.amount, it.unit, it.kcal, it.p, it.f, it.c));
+        sec.items.push(makeItem(it.name, it.amount, it.unit, it.kcal, it.p, it.f, it.c));
       }
       saveDay();
       state.ui.showPasteModal=false; state.ui.pastePreview=null;
@@ -692,6 +801,39 @@ function onClick(e){
       showToast("目標を保存しました");
       break;
     }
+
+    case "paste-template": state.ui.showTmplPasteModal=true; state.ui.tmplPastePreview=null; render(); break;
+    case "close-tmplpaste": state.ui.showTmplPasteModal=false; state.ui.tmplPastePreview=null; render(); break;
+    case "tmplpaste-parse": {
+      const text = document.getElementById("tmpl-paste-text").value;
+      state.ui.tmplPastePreview = parseTemplateText(text);
+      render();
+      break;
+    }
+    case "tmplpaste-back": state.ui.tmplPastePreview=null; render(); break;
+    case "tmplpaste-del-row": {
+      const sidx = parseInt(btn.dataset.sidx,10), idx = parseInt(btn.dataset.idx,10);
+      state.ui.tmplPastePreview[sidx].items.splice(idx,1);
+      render();
+      break;
+    }
+    case "tmplpaste-del-section": {
+      const sidx = parseInt(btn.dataset.sidx,10);
+      state.ui.tmplPastePreview.splice(sidx,1);
+      render();
+      break;
+    }
+    case "tmplpaste-confirm": {
+      state.template = state.ui.tmplPastePreview.map(sec => makeSection(
+        sec.label,
+        sec.items.map(it => makeItem(it.name, it.amount, it.unit, it.kcal, it.p, it.f, it.c))
+      ));
+      saveTemplate();
+      state.ui.showTmplPasteModal=false; state.ui.tmplPastePreview=null;
+      render();
+      showToast("テンプレートを作成しました");
+      break;
+    }
   }
 }
 function readForm(form){
@@ -701,14 +843,25 @@ function readForm(form){
 function onChange(e){
   const el = e.target;
 
-  const prevRow = el.closest(".preview-row");
+  const tmplPrevRow = el.closest(".preview-row[data-sidx]");
+  if(tmplPrevRow && el.dataset.pf){
+    const sidx = parseInt(tmplPrevRow.dataset.sidx,10), idx = parseInt(tmplPrevRow.dataset.idx,10);
+    const it = state.ui.tmplPastePreview[sidx].items[idx];
+    if(it){ const pf=el.dataset.pf; it[pf] = (pf==="name"||pf==="unit") ? el.value : (parseFloat(el.value)||0); }
+    return;
+  }
+  const tmplSectionBlock = el.closest(".tmpl-preview-section");
+  if(tmplSectionBlock && el.dataset.tpf==="label"){
+    const sidx = parseInt(tmplSectionBlock.dataset.sidx,10);
+    state.ui.tmplPastePreview[sidx].label = el.value || state.ui.tmplPastePreview[sidx].label;
+    return;
+  }
+
+  const prevRow = el.closest(".preview-row:not([data-sidx])");
   if(prevRow && el.dataset.pf){
     const idx = parseInt(prevRow.dataset.idx,10);
     const it = state.ui.pastePreview[idx];
-    if(it){
-      const pf = el.dataset.pf;
-      it[pf] = (pf==="name"||pf==="unit") ? el.value : (parseFloat(el.value)||0);
-    }
+    if(it){ const pf=el.dataset.pf; it[pf] = (pf==="name"||pf==="unit") ? el.value : (parseFloat(el.value)||0); }
     return;
   }
 
@@ -717,22 +870,23 @@ function onChange(e){
   const mealKey = row.dataset.meal, itemId = row.dataset.item;
   if(el.dataset.field==="amount"){ updateAmount(mealKey,itemId, parseFloat(el.value)); }
   if(el.dataset.field==="tmpl-amount"){ tmplUpdateAmount(mealKey,itemId, parseFloat(el.value)); }
+  if(el.dataset.field==="section-label"){ tmplRenameSection(mealKey, el.value.trim()); }
 }
 function onBlur(e){
   const el = e.target;
-  if(el.dataset && el.dataset.field==="item-name"){
+  if(!el.dataset) return;
+  if(el.dataset.field==="item-name"){
     const row = el.closest("[data-meal]");
     renameItem(row.dataset.meal, row.dataset.item, el.value.trim());
   }
-  if(el.dataset && el.dataset.field==="tmpl-name"){
+  if(el.dataset.field==="tmpl-name"){
     const row = el.closest("[data-meal]");
     tmplRename(row.dataset.meal, row.dataset.item, el.value.trim());
   }
-  if(el.dataset && el.dataset.field==="steps"){ setSteps(el.value); }
-  if(el.dataset && el.dataset.field==="notes"){ setNotes(el.value); }
+  if(el.dataset.field==="steps"){ setSteps(el.value); }
+  if(el.dataset.field==="notes"){ setNotes(el.value); }
 }
 function bindDynamic(){
-  // live carb preview in settings sheet
   const kcalEl = document.getElementById("set-kcal"), pEl = document.getElementById("set-p"), fEl = document.getElementById("set-f");
   if(kcalEl && pEl && fEl){
     const upd = ()=>{
